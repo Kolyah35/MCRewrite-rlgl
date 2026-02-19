@@ -1,17 +1,17 @@
+#include <raylib.h>
 #include "Level.hpp"
 #include <Frustum.hpp>
 #include <Chunk.hpp>
-#include <glm/common.hpp>
-#include <glm/fwd.hpp>
 #include <memory>
-#include <GLFW/glfw3.h>
 #include <Tile.hpp>
 #include <fstream>
-#include <miniz.h>
 #include <iostream>
+#include <rlgl.h>
 
-Level::Level(int width, int height, int depth) : m_width(width), m_height(height), m_depth(depth), m_blocks(width * height * depth), m_lightDepths(width * height) {
+Level::Level(int width, int height, int depth) : m_width(width), m_height(height), m_depth(depth), m_lightDepths(width * height) {
     if (!load()) {
+        m_blocks = new uint8_t[width * height * depth];
+
         // Fill level with tiles
         for (int x = 0; x < width; x++) {
             for (int y = 0; y < depth; y++) {
@@ -26,17 +26,16 @@ Level::Level(int width, int height, int depth) : m_width(width), m_height(height
         }
     }
 
-    glm::ivec3 chunkCount = {m_width, m_depth, m_height};
-    chunkCount /= CHUNK_SIZE;
+    Vector3i chunkCount = {m_width / CHUNK_SIZE, m_depth / CHUNK_SIZE, m_height / CHUNK_SIZE};
 
     m_chunks.resize(chunkCount.x * chunkCount.y * chunkCount.z);
 
     for (int x = 0; x < chunkCount.x; x++) {
         for (int y = 0; y < chunkCount.y; y++) {
             for (int z = 0; z < chunkCount.z; z++) {
-                glm::ivec3 min = {x * CHUNK_SIZE, y * CHUNK_SIZE, z * CHUNK_SIZE};
+                Vector3i min = {x * CHUNK_SIZE, y * CHUNK_SIZE, z * CHUNK_SIZE};
 
-                glm::ivec3 max = {std::min(m_width, (x + 1) * CHUNK_SIZE), std::min(m_depth, (y + 1) * CHUNK_SIZE), std::min(m_height, (z + 1) * CHUNK_SIZE)};
+                Vector3i max = {std::min(m_width, (x + 1) * CHUNK_SIZE), std::min(m_depth, (y + 1) * CHUNK_SIZE), std::min(m_height, (z + 1) * CHUNK_SIZE)};
 
                 m_chunks[(x + y * chunkCount.x) * chunkCount.z + z] = std::make_shared<Chunk>(*this, min, max);
             }
@@ -46,7 +45,7 @@ Level::Level(int width, int height, int depth) : m_width(width), m_height(height
     calcLightDepths(0, 0, width, height);
 }
 
-bool Level::isSolidTile(const glm::ivec3& pos) {
+bool Level::isSolidTile(Vector3i pos) {
     if (pos.x < 0 || pos.y < 0 || pos.z < 0 || pos.x >= m_width || pos.y >= m_depth || pos.z >= m_height) {
         return false;
     }
@@ -56,74 +55,33 @@ bool Level::isSolidTile(const glm::ivec3& pos) {
     return m_blocks[index] != 0;
 }
 
-void Level::render(const glm::mat4& VP) {
-    auto frustum = Frustum::get();
-    frustum->calculateFrustum(VP);
+void Level::render(int layer) {
+    Frustum& frustum = Frustum::get();
+    frustum.calculateFrustum();
 
     Chunk::buildThisFrame = 0;
 
     for (const auto& chunk : m_chunks) {
-        if (frustum->cubeInFrustum(chunk->getBounds())) {
-            chunk->render();
+        if (frustum.cubeInFrustum(chunk->getBounds())) {
+            chunk->render(layer);
         }
     }
 }
 
 void Level::renderHit(const HitResult& hit) {
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE);
+    rlBegin(RL_QUADS);
+    rlColor4f(1.f, 1.f, 1.f, (float)(std::sin(GetTime() * 10.f) * 0.2f) + 0.4f);
 
-    glBegin(GL_QUADS);
+    static std::vector<ChunkVertex> hitTile(4);
+    hitTile.clear();
 
-    // clang-format off
-    switch (hit.face) {
-        case Faces::Up:
-            glVertex3f(hit.pos.x,     hit.pos.y + 1, hit.pos.z + 1);
-            glVertex3f(hit.pos.x + 1, hit.pos.y + 1, hit.pos.z + 1);
-            glVertex3f(hit.pos.x + 1, hit.pos.y + 1, hit.pos.z    );
-            glVertex3f(hit.pos.x,     hit.pos.y + 1, hit.pos.z    );
-            break;
+    Tile::renderFace(hitTile, *this, 1, hit.pos, hit.face);
 
-        case Faces::Down:
-            glVertex3f(hit.pos.x,     hit.pos.y, hit.pos.z    );
-            glVertex3f(hit.pos.x + 1, hit.pos.y, hit.pos.z    );
-            glVertex3f(hit.pos.x + 1, hit.pos.y, hit.pos.z + 1);
-            glVertex3f(hit.pos.x,     hit.pos.y, hit.pos.z + 1);
-            break;
-
-        case Faces::Right:
-            glVertex3f(hit.pos.x + 1, hit.pos.y,     hit.pos.z    );
-            glVertex3f(hit.pos.x + 1, hit.pos.y + 1, hit.pos.z    );
-            glVertex3f(hit.pos.x + 1, hit.pos.y + 1, hit.pos.z + 1);
-            glVertex3f(hit.pos.x + 1, hit.pos.y,     hit.pos.z + 1);
-            break;
-
-        case Faces::Left:
-            glVertex3f(hit.pos.x, hit.pos.y,     hit.pos.z    );
-            glVertex3f(hit.pos.x, hit.pos.y    , hit.pos.z + 1);
-            glVertex3f(hit.pos.x, hit.pos.y + 1, hit.pos.z + 1);
-            glVertex3f(hit.pos.x, hit.pos.y + 1, hit.pos.z    );
-            break;
-
-        case Faces::Front:
-            glVertex3f(hit.pos.x,     hit.pos.y,     hit.pos.z + 1);
-            glVertex3f(hit.pos.x + 1, hit.pos.y,     hit.pos.z + 1);
-            glVertex3f(hit.pos.x + 1, hit.pos.y + 1, hit.pos.z + 1);
-            glVertex3f(hit.pos.x,     hit.pos.y + 1, hit.pos.z + 1);
-            break;
-
-        case Faces::Back:
-            glVertex3f(hit.pos.x,     hit.pos.y,     hit.pos.z);
-            glVertex3f(hit.pos.x,     hit.pos.y + 1, hit.pos.z);
-            glVertex3f(hit.pos.x + 1, hit.pos.y + 1, hit.pos.z);
-            glVertex3f(hit.pos.x + 1, hit.pos.y,     hit.pos.z);
-            break;
+    for (auto& vertex : hitTile) {
+        rlTexCoord2f(vertex.u, vertex.v);
+        rlVertex3f(vertex.x, vertex.y, vertex.z);
     }
-    // clang-format on
-
-    glEnd();
-
-    glDisable(GL_BLEND);
+    rlEnd();
 }
 
 void Level::calcLightDepths(int minX, int minZ, int maxX, int maxZ) {
@@ -132,7 +90,7 @@ void Level::calcLightDepths(int minX, int minZ, int maxX, int maxZ) {
             int prevDepth = m_lightDepths[x + z * m_width];
 
             int depth = m_depth - 1;
-            while (depth > 0 && !isSolidTile(glm::vec3(x, depth, z))) {
+            while (depth > 0 && !isSolidTile(Vector3i(x, depth, z))) {
                 depth--;
             }
 
@@ -142,13 +100,13 @@ void Level::calcLightDepths(int minX, int minZ, int maxX, int maxZ) {
                 int minTileChangeY = std::min(prevDepth, depth);
                 int maxTileChangeY = std::max(prevDepth, depth);
 
-                rebuildChunks(glm::ivec3(x - 1, minTileChangeY - 1, z - 1), glm::ivec3(x + 1, maxTileChangeY + 1, z + 1));
+                rebuildChunks(Vector3i(x - 1, minTileChangeY - 1, z - 1), Vector3i(x + 1, maxTileChangeY + 1, z + 1));
             }
         }
     }
 }
 
-void Level::rebuildChunks(glm::ivec3 min, glm::ivec3 max) {
+void Level::rebuildChunks(Vector3i min, Vector3i max) {
     min /= CHUNK_SIZE;
     max /= CHUNK_SIZE;
 
@@ -170,7 +128,7 @@ void Level::rebuildChunks(glm::ivec3 min, glm::ivec3 max) {
     }
 }
 
-void Level::setTile(const glm::ivec3& pos, int id) {
+void Level::setTile(Vector3i pos, int id) {
     if (pos.x < 0 || pos.y < 0 || pos.z < 0 || pos.x >= m_width || pos.y >= m_depth || pos.z >= m_height) {
         return;
     }
@@ -181,7 +139,7 @@ void Level::setTile(const glm::ivec3& pos, int id) {
     rebuildChunks(pos - 1, pos + 1);
 }
 
-float Level::getBrightness(const glm::ivec3& pos) {
+float Level::getBrightness(Vector3i pos) {
     float dark = 0.8f;
     float light = 1.0f;
 
@@ -200,7 +158,7 @@ std::vector<AABB> Level::getCubes(const AABB& other) {
     std::vector<AABB> aabbs;
 
     auto pos0 = other.min();
-    auto pos1 = other.max() + 1.f;
+    auto pos1 = Vector3AddValue(other.max(), 1.f);
 
     if (pos0.x < 0) {
         pos0.x = 0;
@@ -230,7 +188,7 @@ std::vector<AABB> Level::getCubes(const AABB& other) {
         for (int y = pos0.y; y < pos1.y; y++) {
             for (int z = pos0.z; z < pos1.z; z++) {
                 if (isSolidTile({x, y, z})) {
-                    aabbs.push_back(AABB(glm::vec3(x, y, z), glm::vec3(x, y, z) + 1.f));
+                    aabbs.push_back(AABB(Vector3(x, y, z), Vector3AddValue(Vector3(x, y, z), 1.f)));
                 }
             }
         }
@@ -246,72 +204,22 @@ void Level::save() {
         return;
     }
 
-    mz_stream stream;
-    memset(&stream, 0, sizeof(stream));
-    stream.next_in = m_blocks.data();
-    stream.avail_in = m_blocks.size();
-
-    int status = mz_deflateInit2(&stream, MZ_DEFAULT_COMPRESSION, MZ_DEFLATED, -MZ_DEFAULT_WINDOW_BITS, 9, MZ_DEFAULT_STRATEGY);
-
-    if (status != MZ_OK) {
-        std::cerr << "GZIP init failed: " << zError(status) << std::endl;
-        file.close();
-        return;
-    }
+    int outSize;
+    unsigned char* compressed = CompressData((const unsigned char*)m_blocks, m_width * m_height * m_depth, &outSize);
 
     file.write("\x1f\x8b\x08\0\0\0\0\0\0\xff", 10);
-
-    uint8_t out_buffer[4096];
-    do {
-        stream.next_out = out_buffer;
-        stream.avail_out = sizeof(out_buffer);
-
-        status = mz_deflate(&stream, MZ_FINISH);
-        if (status != MZ_OK && status != MZ_STREAM_END) {
-            std::cerr << "Compression error: " << status << std::endl;
-            mz_deflateEnd(&stream);
-            file.close();
-            return;
-        }
-
-        file.write((const char*)out_buffer, sizeof(out_buffer) - stream.avail_out);
-    } while (status != MZ_STREAM_END);
-
-    mz_deflateEnd(&stream);
+    file.write((const char*)compressed, outSize);
     file.close();
 }
 
 bool Level::load() {
-    auto file = std::basic_ifstream<uint8_t>("level.dat", std::ios::binary);
-    if (!file) {
-        return false;
-    }
+    int size;
+    auto data = LoadFileData("level.dat", &size);
 
-    mz_stream stream = {0};
-    if (mz_inflateInit2(&stream, -MZ_DEFAULT_WINDOW_BITS) != MZ_OK) {
-        file.close();
-        return false;
-    }
+    if (!data) return false;
 
-    std::vector<uint8_t> buf;
-    file.seekg(0, std::ios::end);
-    size_t size = file.tellg();
-    file.seekg(0, std::ios::beg);
+    m_blocks = DecompressData(data + 10, size - 10, &size);
+    MemFree(data);
 
-    buf.resize(size);
-    file.read(buf.data(), size);
-
-    stream.next_out = m_blocks.data();
-    stream.avail_out = m_blocks.size();
-    stream.next_in = buf.data() + 10;
-    stream.avail_in = buf.size() - 10;
-
-    int status = mz_inflate(&stream, MZ_NO_FLUSH);
-    if (status != MZ_OK && status != MZ_STREAM_END) {
-        return false;
-    }
-
-    mz_inflateEnd(&stream);
-    file.close();
     return true;
 }

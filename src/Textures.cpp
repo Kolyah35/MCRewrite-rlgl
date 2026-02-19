@@ -1,41 +1,34 @@
 #include <Textures.hpp>
 #include <iostream>
-#include <glad/glad.h>
+#include <raylib.h>
+#include <rlgl.h>
+#include <unordered_map>
 
-#define STB_IMAGE_IMPLEMENTATION
-#include <stb_image.h>
+std::unordered_map<std::string, unsigned int> idMap;
 
-int lastId = INT_MIN;
+unsigned int Textures::loadTexture(const std::string& resourceName, int mode) {
+    if (idMap.contains(resourceName)) {
+        return idMap.at(resourceName);
+    }
 
-int Textures::loadTexture(const std::string& resourceName, int mode) {
-    // Generate a new texture id
-    GLuint id;
-    glGenTextures(1, &id);
-
-    bind(id);
-
-    // Set texture filter mode
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, mode);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, mode);
-
-    int width, height, channels;
-    unsigned char* data = stbi_load(resourceName.c_str(), &width, &height, &channels, 4);
-
-    if (!data) {
+    std::string path = "resources/" + resourceName;
+    Image image = LoadImage(path.c_str());
+    if (image.data == nullptr) {
         std::cerr << "Texture load failed: " << resourceName << std::endl;
         return 0;
     }
 
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
-    glGenerateMipmap(GL_TEXTURE_2D);
-    stbi_image_free(data);
+    auto id = rlLoadTexture(image.data, image.width, image.height, image.format, image.mipmaps);
+    rlTextureParameters(id, RL_TEXTURE_MIN_FILTER, mode);
+    rlTextureParameters(id, RL_TEXTURE_MAG_FILTER, mode);
+
+    int mipmaps;
+    rlGenTextureMipmaps(id, image.width, image.height, RL_PIXELFORMAT_UNCOMPRESSED_R8G8B8A8, &mipmaps);
+
+    UnloadImage(image);
+    idMap.insert(std::make_pair(resourceName, id));
+
+    std::cout << resourceName << " -> " << id << std::endl; 
 
     return id;
-}
-
-void Textures::bind(int id) {
-    if (id != lastId) {
-        glBindTexture(GL_TEXTURE_2D, id);
-        lastId = id;
-    }
 }

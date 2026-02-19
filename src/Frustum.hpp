@@ -2,34 +2,30 @@
 #include <AABB.hpp>
 #include <vector>
 
-enum FrustumSide {
-    LEFT = 0,
-    RIGHT = 1,
-    BOTTOM = 2,
-    TOP = 3,
-    BACK = 4,
-    FRONT = 5
-};
-
-struct FrustumPlane {
-    glm::vec3 normal;
-    float distance;
-};
+/*
+ * Author: Ben Humphrey (DigiBen)
+ * E-mail: digiben@gametutorials.com
+ */
 
 class Frustum {
 private:
-    std::vector<FrustumPlane> m_planes;
+    float m_Frustum[6][4];
 
 public:
     Frustum();
 
-    static Frustum* get() {
-        static auto frustum = new Frustum();
+    static Frustum& get() {
+        static Frustum frustum;
         return frustum;
     }
 
-    void calculateFrustum(const glm::mat4& mvp);
+    void normalizePlane(int side);
+    void calculateFrustum();
 
-    bool cubeInFrustum(const glm::vec3& min, const glm::vec3& max);
+    bool pointInFrustum(float x, float y, float z);
+
+    bool sphereInFrustum(float x, float y, float z, float radius);
+
+    bool cubeInFrustum(Vector3 min, Vector3 max);
     bool cubeInFrustum(const AABB& aabb);
 };

@@ -1,26 +1,27 @@
+#include <raylib.h>
+
 #include <Player.hpp>
 #include <Game.hpp>
 #include <algorithm>
 #include <impl/Math.hpp>
-#include <impl/InputHelper.hpp>
 
 Player::Player(Level& level) : m_level(level), m_pos(0.f), m_prevPos(0.f), m_aabb(), m_rot(0.f), m_motion(0.f), m_onGround(false) {
     resetPos();
 }
 
 void Player::resetPos() {
-    setPos({Math::random() * m_level.getWidth(), m_level.getDepth() + 3, Math::random() * m_level.getHeight()});
+    setPos({(float)Math::random() * m_level.getWidth(), (float)m_level.getDepth() + 3, (float)Math::random() * m_level.getHeight()});
 }
 
-void Player::setPos(const glm::vec3& pos) {
+void Player::setPos(Vector3 pos) {
     const float w = .3f;
     const float h = .9f;
 
     m_pos = pos;
-    m_aabb = AABB(m_pos - glm::vec3(w, h, w), m_pos + glm::vec3(w, h, w));
+    m_aabb = AABB(m_pos - Vector3(w, h, w), m_pos + Vector3(w, h, w));
 }
 
-void Player::turn(const glm::vec2& delta) {
+void Player::turn(Vector2 delta) {
     m_rot += delta * 0.15f;
     m_rot.y = std::clamp(m_rot.y, -89.9f, 89.9f); // using 89.9 feels like a cheat but im too lazy to make it better =)
 }
@@ -30,27 +31,27 @@ void Player::tick() {
     float forward, vertical;
     forward = vertical = 0.f;
 
-    if (InputHelper::isKeyDown(GLFW_KEY_R)) {
+    if (IsKeyDown(KEY_R)) {
         resetPos();
     }
 
-    if (InputHelper::isKeyDown(GLFW_KEY_UP) || InputHelper::isKeyDown(GLFW_KEY_W)) {
+    if (IsKeyDown(KEY_UP) || IsKeyDown(KEY_W)) {
         forward += 1.f;
     }
 
-    if (InputHelper::isKeyDown(GLFW_KEY_DOWN) || InputHelper::isKeyDown(GLFW_KEY_S)) {
+    if (IsKeyDown(KEY_DOWN) || IsKeyDown(KEY_S)) {
         forward -= 1.f;
     }
 
-    if (InputHelper::isKeyDown(GLFW_KEY_LEFT) || InputHelper::isKeyDown(GLFW_KEY_A)) {
+    if (IsKeyDown(KEY_LEFT) || IsKeyDown(KEY_A)) {
         vertical -= 1.f;
     }
 
-    if (InputHelper::isKeyDown(GLFW_KEY_RIGHT) || InputHelper::isKeyDown(GLFW_KEY_D)) {
+    if (IsKeyDown(KEY_RIGHT) || IsKeyDown(KEY_D)) {
         vertical += 1.f;
     }
 
-    if ((InputHelper::isKeyDown(GLFW_KEY_SPACE) || InputHelper::isKeyDown(GLFW_KEY_LEFT_SUPER)) && m_onGround) {
+    if ((IsKeyDown(KEY_SPACE) || IsKeyDown(KEY_LEFT_SUPER)) && m_onGround) {
         m_motion.y = .12f;
     }
 
@@ -60,7 +61,7 @@ void Player::tick() {
 
     move(m_motion);
 
-    m_motion *= glm::vec3(0.91f, 0.98f, 0.91f);
+    m_motion *= Vector3(0.91f, 0.98f, 0.91f);
 
     if (m_onGround) {
         m_motion.x *= 0.8f;
@@ -68,7 +69,7 @@ void Player::tick() {
     }
 }
 
-void Player::move(const glm::vec3& delta) {
+void Player::move(Vector3 delta) {
     auto org = delta;
     auto a = delta;
     auto aabbs = m_level.getCubes(m_aabb.expand(delta));
@@ -76,17 +77,17 @@ void Player::move(const glm::vec3& delta) {
     for (auto& aabb : aabbs) {
         a.x = aabb.clipXCollide(m_aabb, a.x);
     }
-    m_aabb.move(glm::vec3(a.x, 0.f, 0.f));
+    m_aabb.move(Vector3(a.x, 0.f, 0.f));
 
     for (auto& aabb : aabbs) {
         a.y = aabb.clipYCollide(m_aabb, a.y);
     }
-    m_aabb.move(glm::vec3(0.f, a.y, 0.f));
+    m_aabb.move(Vector3(0.f, a.y, 0.f));
 
     for (auto& aabb : aabbs) {
         a.z = aabb.clipZCollide(m_aabb, a.z);
     }
-    m_aabb.move(glm::vec3(0.f, 0.f, a.z));
+    m_aabb.move(Vector3(0.f, 0.f, a.z));
 
     m_onGround = org.y != a.y && org.y < 0.f;
 
@@ -106,15 +107,15 @@ void Player::move(const glm::vec3& delta) {
 }
 
 void Player::moveRelative(float xa, float za, float speed) {
-    glm::vec2 input(xa, za);
+    Vector2 input(xa, za);
 
-    if (glm::length(input) < 0.1f) {
+    if (Vector2Length(input) < 0.1f) {
         return;
     }
 
-    input = glm::normalize(input) * speed;
+    input = Vector2Normalize(input) * speed;
 
-    float yawRad = glm::radians(m_rot.x);
+    float yawRad = m_rot.x * DEG2RAD;
     float cosYaw = cos(yawRad);
     float sinYaw = sin(yawRad);
 

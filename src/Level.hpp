@@ -1,12 +1,10 @@
 #pragma once
 #include <AABB.hpp>
 
-#include <glm/fwd.hpp>
 #include <vector>
 #include <memory>
 
 #include <utils.hpp>
-#include <glad/glad.h>
 
 class Chunk;
 
@@ -14,15 +12,15 @@ class Level {
 public:
     Level(int width, int height, int depth);
 
-    void render(const glm::mat4& VP);
+    void render(int layer);
     void renderHit(const HitResult& hit);
 
-    bool isSolidTile(const glm::ivec3& pos);
+    bool isSolidTile(Vector3i pos);
     void calcLightDepths(int minX, int minZ, int maxX, int maxZ);
-    void rebuildChunks(glm::ivec3 min, glm::ivec3 max);
+    void rebuildChunks(Vector3i min, Vector3i max);
 
-    void setTile(const glm::ivec3& pos, int id);
-    float getBrightness(const glm::ivec3& pos);
+    void setTile(Vector3i pos, int id);
+    float getBrightness(Vector3i pos);
     std::vector<AABB> getCubes(const AABB& other);
 
     inline auto getWidth() const { return m_width; }
@@ -33,7 +31,7 @@ public:
     bool load();
 
 private:
-    std::vector<uint8_t> m_blocks;
+    uint8_t* m_blocks;
     std::vector<int> m_lightDepths;
     std::vector<std::shared_ptr<Chunk>> m_chunks;
 

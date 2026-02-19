@@ -2,5 +2,5 @@
 /.vs/
 /.cache/
 /build/
-/assets/
+/resources/
 /build_linux/

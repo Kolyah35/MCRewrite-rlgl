@@ -1,20 +1,16 @@
+#include <raylib.h>
 #include "Game.hpp"
-#include <GLFW/glfw3.h>
 #include <cmath>
 #include <ctime>
 #include <Timer.hpp>
 #include <Level.hpp>
 #include <Player.hpp>
-#include <glm/fwd.hpp>
-#include <glm/glm.hpp>
-#include <glm/gtc/matrix_transform.hpp>
-#include <glm/gtc/type_ptr.hpp>
-#include <DefaultShader.hpp>
 #include <iostream>
 #include <Textures.hpp>
 #include <Chunk.hpp>
 #include <Icon.hpp>
-#include <impl/InputHelper.hpp>
+#include <rlgl.h>
+#include <raymath.h>
 
 Game::Game() {}
 
@@ -30,81 +26,54 @@ int Game::run() {
     const int width = 1024;
     const int height = 768;
 
-    if (!glfwInit()) {
-        printf("GLFW init error!\n");
-        return -1;
-    }
+    InitWindow(width, height, "Game");
+    Image icon = {
+        .data = (void*)LWJGL_ICON_DATA_16x16,
+        .width = 16,
+        .height = 16,
+        .mipmaps = 1,
+        .format = PIXELFORMAT_UNCOMPRESSED_R8G8B8A8
+    };
 
-    m_window = glfwCreateWindow(width, height, "Game", nullptr, nullptr);
+    SetWindowIcon(icon);
+    SetTargetFPS(0);
 
-    if (!m_window) {
-        glfwTerminate();
-        printf("Error while creating window\n");
-        return -1;
-    }
+    rlClearColor(128, 204, 255, 255);
+    rlEnableDepthTest();
+    rlEnableBackfaceCulling();
 
-    GLFWimage icon = {16, 16, (unsigned char*)LWJGL_ICON_DATA_16x16};
-    glfwSetWindowIcon(m_window, 1, &icon);
-
-    glfwMakeContextCurrent(m_window);
-    glfwSwapInterval(0);
-
-    if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) {
-        glfwTerminate();
-        printf("Error while loading GLAD(os)\n");
-        return -1;
-    }
-
-    glEnable(GL_TEXTURE_2D);
-    glShadeModel(GL_SMOOTH);
-    glClearColor(0.5f, 0.8f, 1.f, 0.f);
-    glClearDepth(1.f);
-    glEnable(GL_DEPTH_TEST);
-    glDepthFunc(GL_LEQUAL);
-
-    glEnable(GL_CULL_FACE);
-
-    m_defaultShader = createShaderProgram(vertexShader, fragmentShader);
-
-    int texture = Textures::loadTexture("terrain.png", GL_NEAREST);
+    int texture = Textures::loadTexture("terrain.png", RL_TEXTURE_FILTER_NEAREST);
 
     if (!texture) {
         return -1;
     }
 
-    glfwSetInputMode(m_window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+    DisableCursor();
 
     Timer timer(60);
     Level level(256, 256, 64);
     Player player(level);
 
-    int frames = 0;
-    auto lastTime = std::chrono::steady_clock::now();
-    glm::dvec2 prevMouse;
-    glm::dvec2 mouse;
+    double lastTime = 0.0;
     HitResult hitResult;
 
-    glfwGetCursorPos(m_window, &prevMouse.x, &prevMouse.y);
+    Matrix projection = MatrixPerspective(70.f * DEG2RAD, (float)width / (float)height, 0.05f, 1000.0f);
+    rlSetMatrixProjection(projection);
 
-    glm::mat4 projection = glm::perspective(glm::radians(70.0f), (float)width / (float)height, 0.05f, 1000.0f);
-
-    while (!glfwGetKey(m_window, GLFW_KEY_ESCAPE) && !glfwWindowShouldClose(m_window)) {
+    while (!WindowShouldClose()) {
         timer.advanceTime();
 
         for (uint32_t i = 0; i < timer.getTicks(); ++i) {
             player.tick();
         }
 
-        glfwGetCursorPos(m_window, &mouse.x, &mouse.y);
+        player.turn(GetMouseDelta());
 
-        player.turn(glm::vec2(mouse.x - prevMouse.x, prevMouse.y - mouse.y));
-        prevMouse = mouse;
-
-        if (hitResult.hit && InputHelper::isMousePressed(GLFW_MOUSE_BUTTON_2)) {
-            level.setTile(hitResult.pos, 0);
+        if (hitResult.hit && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+            level.setTile(Vector3i(hitResult.pos), 0);
         }
 
-        if (hitResult.hit && InputHelper::isMousePressed(GLFW_MOUSE_BUTTON_1)) {
+        if (hitResult.hit && IsMouseButtonPressed(MOUSE_BUTTON_RIGHT)) {
             auto pos = hitResult.pos;
 
             // Get position of the tile using face direction
@@ -131,134 +100,98 @@ int Game::run() {
             level.setTile(pos, 1);
         }
 
-        if (InputHelper::isKeyPressed(GLFW_KEY_ENTER)) {
+        if (IsKeyPressed(KEY_ENTER)) {
             level.save();
         }
 
         // begin render
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        const auto& rot = glm::radians(player.getRot());
+        BeginDrawing();
+
+        rlClearScreenBuffers();
+
+        const auto& rot = player.getRot() * DEG2RAD;
         const auto& pos = player.getPos();
 
-        glm::mat4 view = glm::identity<glm::mat4>();
-        view = glm::translate(view, {0, 0, -0.3f});
-        view = glm::rotate(view, glm::radians(-player.getRot().y), {1, 0, 0});
-        view = glm::rotate(view, glm::radians(player.getRot().x + 90), {0, 1, 0});
-        view = glm::translate(view, -(player.getPrevPos() + (player.getPos() - player.getPrevPos()) * timer.getPartialTicks()));
-        glm::mat4 mvp = projection * view;
+        Vector3 cameraPos = player.getPrevPos() + (pos - player.getPrevPos()) * timer.getPartialTicks();
 
-        glm::vec3 direction = glm::vec3(cos(rot.x) * cos(rot.y), sin(rot.y), sin(rot.x) * cos(rot.y));
+        rlMatrixMode(RL_MODELVIEW);
+        rlLoadIdentity();
+        
+        rlTranslatef(0, 0, -0.3f);
 
-        glm::vec3 cameraPosition = glm::vec3(pos.x, pos.y, pos.z);
+        rlRotatef(rot.y * RAD2DEG, 1, 0, 0);
+        rlRotatef(rot.x * RAD2DEG + 90, 0, 1, 0);
+        
+        rlTranslatef(-cameraPos.x, -cameraPos.y, -cameraPos.z);
 
-        glUseProgram(m_defaultShader);
-        glUniformMatrix4fv(glGetUniformLocation(m_defaultShader, "view"), 1, GL_FALSE, glm::value_ptr(view));
-        glUniformMatrix4fv(glGetUniformLocation(m_defaultShader, "projection"), 1, GL_FALSE, glm::value_ptr(projection));
-        glUniform3fv(glGetUniformLocation(m_defaultShader, "cameraPos"), 1, glm::value_ptr(cameraPosition));
-        glUniform1i(glGetUniformLocation(m_defaultShader, "useUColor"), 0);
-        glUniform1i(glGetUniformLocation(m_defaultShader, "useTexture"), 1);
-        glBindTexture(GL_TEXTURE_2D, texture);
+        rlSetTexture(texture);
+        level.render(1);
+        
 
-        level.render(mvp);
+        Vector3 cameraPosition(pos.x, pos.y, pos.z);
+        Vector3 direction = Vector3(cos(rot.x) * cos(-rot.y), sin(-rot.y), sin(rot.x) * cos(-rot.y));
+
 
         hitResult = pick(cameraPosition, direction, level);
 
         if (hitResult.hit) {
-            glUniform1i(glGetUniformLocation(m_defaultShader, "useUColor"), 1);
-            glUniform1i(glGetUniformLocation(m_defaultShader, "useTexture"), 0);
-            glUniform3f(glGetUniformLocation(m_defaultShader, "uColor"), 1.f, 1.f, 1.f);
-            glUniform1f(glGetUniformLocation(m_defaultShader, "alpha"), (float)(std::sin(glfwGetTime() * 10) * 0.2f) + 0.4f);
-
             level.renderHit(hitResult);
         }
 
-        glfwSwapBuffers(m_window);
-        glfwPollEvents();
-        // end render
+        rlSetTexture(0);
 
-        frames++;
+        EndDrawing();
 
-        auto currentTime = std::chrono::steady_clock::now();
-        if (std::chrono::duration_cast<std::chrono::milliseconds>(currentTime - lastTime).count() >= 1000) {
-            std::cout << frames << " fps, " << Chunk::updates << std::endl;
+        auto currentTime = GetTime();
+        if (GetTime() >= lastTime + 1.0) {
+            std::cout << GetFPS() << " fps, " << Chunk::updates << std::endl;
 
             Chunk::updates = 0;
             lastTime = currentTime;
-            frames = 0;
         }
     }
 
-    level.save();
+    // level.save();
 
-    glfwDestroyWindow(m_window);
-    glfwTerminate();
+    CloseWindow();
 
     return 0;
 }
 
-GLuint Game::createShader(const std::string_view& data, GLenum shaderType) {
-    GLuint shader = glCreateShader(shaderType);
-    const char* ptr = data.data();
-    glShaderSource(shader, 1, &ptr, NULL);
-    glCompileShader(shader);
-
-    int success;
-    char infoLog[512];
-    glGetShaderiv(shader, GL_COMPILE_STATUS, &success);
-
-    if (!success) {
-        glGetShaderInfoLog(shader, 512, NULL, infoLog);
-        std::cerr << "Shader compile error:\n" << infoLog << std::endl;
-    }
-
-    return shader;
-}
-
-GLuint Game::createShaderProgram(const std::string_view& vertexData, const std::string_view& fragmentData) {
-    GLuint vertexShader = createShader(vertexData, GL_VERTEX_SHADER);
-    GLuint fragmentShader = createShader(fragmentData, GL_FRAGMENT_SHADER);
-
-    GLuint shaderProgram = glCreateProgram();
-    glAttachShader(shaderProgram, vertexShader);
-    glAttachShader(shaderProgram, fragmentShader);
-    glLinkProgram(shaderProgram);
-
-    int success;
-    char infoLog[512];
-    glGetProgramiv(shaderProgram, GL_LINK_STATUS, &success);
-    if (!success) {
-        glGetProgramInfoLog(shaderProgram, 512, NULL, infoLog);
-        std::cerr << "Shader link error:\n" << infoLog << std::endl;
-    }
-
-    glDeleteShader(vertexShader);
-    glDeleteShader(fragmentShader);
-
-    return shaderProgram;
-}
-
-HitResult Game::pick(const glm::vec3& start, const glm::vec3& direction, Level& level) {
+HitResult Game::pick(const Vector3& start, const Vector3& direction, Level& level) {
     HitResult result;
 
-    const glm::vec3 dir = glm::normalize(direction);
-    glm::vec3 currentPos = start;
+    const Vector3 dir = Vector3Normalize(direction);
+    Vector3 currentPos = start;
 
     // DDA (Digital Differential Analyzer)
-    glm::ivec3 mapPos = glm::ivec3(floor(currentPos.x), floor(currentPos.y), floor(currentPos.z));
-    glm::vec3 deltaDist = glm::vec3(std::abs(1.0f / dir.x), std::abs(1.0f / dir.y), std::abs(1.0f / dir.z));
+    Vector3i mapPos = Vector3i(floor(currentPos.x), floor(currentPos.y), floor(currentPos.z));
+    Vector3 deltaDist = Vector3(std::abs(1.0f / dir.x), std::abs(1.0f / dir.y), std::abs(1.0f / dir.z));
 
-    glm::ivec3 step;
-    glm::vec3 sideDist;
+    Vector3i step;
+    Vector3 sideDist;
 
-    for (int i = 0; i < 3; ++i) {
-        if (dir[i] < 0) {
-            step[i] = -1;
-            sideDist[i] = (currentPos[i] - mapPos[i]) * deltaDist[i];
-        } else {
-            step[i] = 1;
-            sideDist[i] = (mapPos[i] + 1.0f - currentPos[i]) * deltaDist[i];
-        }
+    if (dir.x < 0) {
+        step.x = -1;
+        sideDist.x = (currentPos.x - mapPos.x) * deltaDist.x;
+    } else {
+        step.x = 1;
+        sideDist.x = (mapPos.x + 1.0f - currentPos.x) * deltaDist.x;
+    }
+    if (dir.y < 0) {
+        step.y = -1;
+        sideDist.y = (currentPos.y - mapPos.y) * deltaDist.y;
+    } else {
+        step.y = 1;
+        sideDist.y = (mapPos.y + 1.0f - currentPos.y) * deltaDist.y;
+    }
+    if (dir.z < 0) {
+        step.z = -1;
+        sideDist.z = (currentPos.z - mapPos.z) * deltaDist.z;
+    } else {
+        step.z = 1;
+        sideDist.z = (mapPos.z + 1.0f - currentPos.z) * deltaDist.z;
     }
 
     // DDA cycle
@@ -283,7 +216,7 @@ HitResult Game::pick(const glm::vec3& start, const glm::vec3& direction, Level& 
 
         if (level.isSolidTile(mapPos)) {
             result.hit = true;
-            result.pos = mapPos;
+            result.pos = (Vector3)mapPos;
             break;
         }
     }

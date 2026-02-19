@@ -1,9 +1,10 @@
 #include "AABB.hpp"
 #include <algorithm>
+#include <raymath.h>
 
-AABB::AABB(const glm::vec3& min, const glm::vec3& max) : m_min(min), m_max(max) {}
+AABB::AABB(Vector3 min, Vector3 max) : m_min(min), m_max(max) {}
 
-AABB AABB::expand(const glm::vec3& size) {
+AABB AABB::expand(Vector3 size) {
     auto min = m_min;
     auto max = m_max;
 
@@ -31,7 +32,7 @@ AABB AABB::expand(const glm::vec3& size) {
     return AABB(min, max);
 }
 
-AABB AABB::grow(const glm::vec3& size) {
+AABB AABB::grow(Vector3 size) {
     return AABB(m_min - size, m_max + size);
 }
 
@@ -94,7 +95,7 @@ bool AABB::intersects(AABB& other) {
            (other.m_max.z > m_min.z && other.m_min.z < m_max.z);
 }
 
-void AABB::move(const glm::vec3& other) {
+void AABB::move(Vector3 other) {
     m_min += other;
     m_max += other;
 }
