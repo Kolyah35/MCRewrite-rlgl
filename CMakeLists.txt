@@ -6,7 +6,15 @@ set(CMAKE_CXX_STANDARD_REQUIRED TRUE)
 
 include(${CMAKE_SOURCE_DIR}/cmake/CPM.cmake)
 
-CPMAddPackage("gh:raysan5/raylib#5.5")
+CPMAddPackage(
+    NAME raylib
+    GITHUB_REPOSITORY "raysan5/raylib"
+    GIT_TAG "5.5"
+    EXCLUDE_FROM_ALL TRUE
+    OPTIONS
+        # "GRAPHICS GRAPHICS_API_OPENGL_11"
+)
+
 # CPMAddpackage("gh:wolfpld/tracy@0.13.1")
 
 file(GLOB SOURCES

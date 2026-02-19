@@ -18,9 +18,26 @@
 #include "fog/glsl120.hpp"
 #elif defined(GRAPHICS_API_OPENGL_33) || defined(GRAPHICS_API_OPENGL_43)
 #include "fog/glsl330.hpp"
+#define USE_FOG_SHADER
 #endif
 
 Game::Game() {}
+
+void rlGluPerspective(double fovy, double aspect, double zNear, double zFar) {
+    double f = 1.0 / tan(fovy * 0.5 * M_PI / 180.0);
+
+    float m[16] = {0};
+
+    m[0]  = (float)(f / aspect);
+    m[5]  = (float)(f);
+    m[10] = (float)((zFar + zNear) / (zNear - zFar));
+    m[11] = -1.0f;
+    m[14] = (float)((2.0 * zFar * zNear) / (zNear - zFar));
+
+    rlMatrixMode(RL_PROJECTION);
+    rlLoadIdentity();
+    rlMultMatrixf(m);
+}
 
 int Game::run() {
     static bool hasStarted = false;
@@ -56,9 +73,11 @@ int Game::run() {
         return -1;
     }
 
+#ifdef USE_FOG_SHADER
     Shader fogShader = LoadShaderFromMemory(fog_vs.begin(), fog_fs.begin());
     fogShader.locs[SHADER_LOC_MATRIX_MODEL] = GetShaderLocation(fogShader, "matModel");
     fogShader.locs[SHADER_LOC_VECTOR_VIEW] = GetShaderLocation(fogShader, "viewPos");
+#endif
 
     DisableCursor();
 
@@ -127,6 +146,10 @@ int Game::run() {
 
         Vector3 cameraPos = player.getPrevPos() + (pos - player.getPrevPos()) * timer.getPartialTicks();
 
+#ifdef GRAPHICS_API_OPENGL_11
+        rlGluPerspective(70.f, (float)width / (float)height, 0.05f, 1000.f);
+#endif        
+
         rlMatrixMode(RL_MODELVIEW);
         rlLoadIdentity();
         
@@ -137,16 +160,18 @@ int Game::run() {
         
         rlTranslatef(-cameraPos.x, -cameraPos.y, -cameraPos.z);
 
-        SetShaderValue(fogShader, fogShader.locs[SHADER_LOC_VECTOR_VIEW], &cameraPos.x, SHADER_UNIFORM_VEC3);
-
         rlSetTexture(texture);
         level.render(1);
         rlSetTexture(0);
 
+#ifdef USE_FOG_SHADER
+        SetShaderValue(fogShader, fogShader.locs[SHADER_LOC_VECTOR_VIEW], &cameraPos.x, SHADER_UNIFORM_VEC3);
+
         BeginShaderMode(fogShader);
         level.render(0);
         EndShaderMode();
-        
+#endif        
+
         Vector3 cameraPosition(pos.x, pos.y, pos.z);
         Vector3 direction = Vector3(cos(rot.x) * cos(-rot.y), sin(-rot.y), sin(rot.x) * cos(-rot.y));
 
