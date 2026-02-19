@@ -18,13 +18,14 @@ void Tile::renderFace(std::vector<ChunkVertex>& vertices, Level& level, int tile
     switch (face) {
     case Faces::Front:
         brightness = level.getBrightness(Vector3i(pos.x, pos.y, pos.z + 1)) * shade.z;
+        shadow = !(brightness == shade.z);
 
         // clang-format off
         vertices.insert(vertices.end(), {
-            {pos.x,     pos.y,     pos.z + 1, brightness, minU, maxV},
-            {pos.x + 1, pos.y,     pos.z + 1, brightness, maxU, maxV},
-            {pos.x + 1, pos.y + 1, pos.z + 1, brightness, maxU, minV,},
-            {pos.x,     pos.y + 1, pos.z + 1, brightness, minU, minV}
+            {pos.x,     pos.y,     pos.z + 1, brightness, minU, maxV, shadow},
+            {pos.x + 1, pos.y,     pos.z + 1, brightness, maxU, maxV, shadow},
+            {pos.x + 1, pos.y + 1, pos.z + 1, brightness, maxU, minV, shadow},
+            {pos.x,     pos.y + 1, pos.z + 1, brightness, minU, minV, shadow}
         });
         // clang-format on
 
@@ -35,10 +36,10 @@ void Tile::renderFace(std::vector<ChunkVertex>& vertices, Level& level, int tile
 
         // clang-format off
         vertices.insert(vertices.end(), {
-            {pos.x,     pos.y,     pos.z, brightness, maxU, maxV},
-            {pos.x,     pos.y + 1, pos.z, brightness, maxU, minV},
-            {pos.x + 1, pos.y + 1, pos.z, brightness, minU, minV},
-            {pos.x + 1, pos.y,     pos.z, brightness, minU, maxV}
+            {pos.x,     pos.y,     pos.z, brightness, maxU, maxV, shadow},
+            {pos.x,     pos.y + 1, pos.z, brightness, maxU, minV, shadow},
+            {pos.x + 1, pos.y + 1, pos.z, brightness, minU, minV, shadow},
+            {pos.x + 1, pos.y,     pos.z, brightness, minU, maxV, shadow}
         });
         // clang-format on
 
@@ -49,10 +50,10 @@ void Tile::renderFace(std::vector<ChunkVertex>& vertices, Level& level, int tile
 
         // clang-format off
         vertices.insert(vertices.end(), {
-            {pos.x, pos.y,     pos.z,     brightness, minU, maxV},
-            {pos.x, pos.y,     pos.z + 1, brightness, maxU, maxV},
-            {pos.x, pos.y + 1, pos.z + 1, brightness, maxU, minV},
-            {pos.x, pos.y + 1, pos.z,     brightness, minU, minV}
+            {pos.x, pos.y,     pos.z,     brightness, minU, maxV, shadow},
+            {pos.x, pos.y,     pos.z + 1, brightness, maxU, maxV, shadow},
+            {pos.x, pos.y + 1, pos.z + 1, brightness, maxU, minV, shadow},
+            {pos.x, pos.y + 1, pos.z,     brightness, minU, minV, shadow}
         });
         // clang-format on
 
@@ -63,10 +64,10 @@ void Tile::renderFace(std::vector<ChunkVertex>& vertices, Level& level, int tile
 
         // clang-format off
         vertices.insert(vertices.end(), {
-            {pos.x + 1, pos.y,     pos.z,     brightness, maxU, maxV},
-            {pos.x + 1, pos.y + 1, pos.z,     brightness, maxU, minV},
-            {pos.x + 1, pos.y + 1, pos.z + 1, brightness, minU, minV},
-            {pos.x + 1, pos.y,     pos.z + 1, brightness, minU, maxV}
+            {pos.x + 1, pos.y,     pos.z,     brightness, maxU, maxV, shadow},
+            {pos.x + 1, pos.y + 1, pos.z,     brightness, maxU, minV, shadow},
+            {pos.x + 1, pos.y + 1, pos.z + 1, brightness, minU, minV, shadow},
+            {pos.x + 1, pos.y,     pos.z + 1, brightness, minU, maxV, shadow}
         });
         // clang-format on
 
@@ -77,10 +78,10 @@ void Tile::renderFace(std::vector<ChunkVertex>& vertices, Level& level, int tile
 
         // clang-format off
         vertices.insert(vertices.end(), {
-            {pos.x,     pos.y + 1, pos.z + 1, brightness, minU, maxV},
-            {pos.x + 1, pos.y + 1, pos.z + 1, brightness, maxU, maxV},
-            {pos.x + 1, pos.y + 1, pos.z,     brightness, maxU, minV},
-            {pos.x,     pos.y + 1, pos.z,     brightness, minU, minV}
+            {pos.x,     pos.y + 1, pos.z + 1, brightness, minU, maxV, shadow},
+            {pos.x + 1, pos.y + 1, pos.z + 1, brightness, maxU, maxV, shadow},
+            {pos.x + 1, pos.y + 1, pos.z,     brightness, maxU, minV, shadow},
+            {pos.x,     pos.y + 1, pos.z,     brightness, minU, minV, shadow}
         });
         // clang-format on
 
@@ -91,10 +92,10 @@ void Tile::renderFace(std::vector<ChunkVertex>& vertices, Level& level, int tile
 
         // clang-format off
         vertices.insert(vertices.end(), {
-            {pos.x,     pos.y, pos.z,     brightness, minU, minV},
-            {pos.x + 1, pos.y, pos.z,     brightness, maxU, minV},
-            {pos.x + 1, pos.y, pos.z + 1, brightness, maxU, maxV},
-            {pos.x,     pos.y, pos.z + 1, brightness, minU, maxV}
+            {pos.x,     pos.y, pos.z,     brightness, minU, minV, shadow},
+            {pos.x + 1, pos.y, pos.z,     brightness, maxU, minV, shadow},
+            {pos.x + 1, pos.y, pos.z + 1, brightness, maxU, maxV, shadow},
+            {pos.x,     pos.y, pos.z + 1, brightness, minU, maxV, shadow}
         });
         // clang-format on
 

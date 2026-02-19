@@ -69,6 +69,7 @@ void Level::render(int layer) {
 }
 
 void Level::renderHit(const HitResult& hit) {
+    rlSetBlendMode(RL_BLEND_ADDITIVE);
     rlBegin(RL_QUADS);
     rlColor4f(1.f, 1.f, 1.f, (float)(std::sin(GetTime() * 10.f) * 0.2f) + 0.4f);
 
@@ -82,6 +83,7 @@ void Level::renderHit(const HitResult& hit) {
         rlVertex3f(vertex.x, vertex.y, vertex.z);
     }
     rlEnd();
+    rlSetBlendMode(RL_BLEND_ALPHA);
 }
 
 void Level::calcLightDepths(int minX, int minZ, int maxX, int maxZ) {

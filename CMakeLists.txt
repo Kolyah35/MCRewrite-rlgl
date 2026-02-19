@@ -7,6 +7,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED TRUE)
 include(${CMAKE_SOURCE_DIR}/cmake/CPM.cmake)
 
 CPMAddPackage("gh:raysan5/raylib#5.5")
+# CPMAddpackage("gh:wolfpld/tracy@0.13.1")
 
 file(GLOB SOURCES
     ${CMAKE_SOURCE_DIR}/src/impl/*.cpp
@@ -15,10 +16,10 @@ file(GLOB SOURCES
 
 add_executable(${PROJECT_NAME} ${SOURCES})
 
-target_link_libraries(${PROJECT_NAME} raylib)
-target_include_directories(${PROJECT_NAME} PUBLIC  
-    ${CMAKE_SOURCE_DIR}/src
+target_link_libraries(${PROJECT_NAME} raylib 
+    # Tracy::TracyClient
 )
+target_include_directories(${PROJECT_NAME} PUBLIC ${CMAKE_SOURCE_DIR}/src)
 
 if(EXISTS ${CMAKE_SOURCE_DIR}/assets)
     add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_SOURCE_DIR}/resources/terrain.png" "$<TARGET_FILE_DIR:${PROJECT_NAME}>/")

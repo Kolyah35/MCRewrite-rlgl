@@ -12,6 +12,14 @@
 #include <rlgl.h>
 #include <raymath.h>
 
+#if defined(GRAPHICS_API_OPENGL_ES2)
+#include "fog/glsl100.hpp"
+#elif defined(GRAPHICS_API_OPENGL_21)
+#include "fog/glsl120.hpp"
+#elif defined(GRAPHICS_API_OPENGL_33) || defined(GRAPHICS_API_OPENGL_43)
+#include "fog/glsl330.hpp"
+#endif
+
 Game::Game() {}
 
 int Game::run() {
@@ -47,6 +55,10 @@ int Game::run() {
     if (!texture) {
         return -1;
     }
+
+    Shader fogShader = LoadShaderFromMemory(fog_vs.begin(), fog_fs.begin());
+    fogShader.locs[SHADER_LOC_MATRIX_MODEL] = GetShaderLocation(fogShader, "matModel");
+    fogShader.locs[SHADER_LOC_VECTOR_VIEW] = GetShaderLocation(fogShader, "viewPos");
 
     DisableCursor();
 
@@ -125,21 +137,26 @@ int Game::run() {
         
         rlTranslatef(-cameraPos.x, -cameraPos.y, -cameraPos.z);
 
+        SetShaderValue(fogShader, fogShader.locs[SHADER_LOC_VECTOR_VIEW], &cameraPos.x, SHADER_UNIFORM_VEC3);
+
         rlSetTexture(texture);
         level.render(1);
-        
+        rlSetTexture(0);
 
+        BeginShaderMode(fogShader);
+        level.render(0);
+        EndShaderMode();
+        
         Vector3 cameraPosition(pos.x, pos.y, pos.z);
         Vector3 direction = Vector3(cos(rot.x) * cos(-rot.y), sin(-rot.y), sin(rot.x) * cos(-rot.y));
-
 
         hitResult = pick(cameraPosition, direction, level);
 
         if (hitResult.hit) {
+            rlSetTexture(texture);
             level.renderHit(hitResult);
+            rlSetTexture(0);
         }
-
-        rlSetTexture(0);
 
         EndDrawing();
 
@@ -152,7 +169,7 @@ int Game::run() {
         }
     }
 
-    // level.save();
+    level.save();
 
     CloseWindow();
 

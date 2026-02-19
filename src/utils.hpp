@@ -5,6 +5,7 @@ struct ChunkVertex {
     float x, y, z;
     float brightness;
     float u, v;
+    bool shadow;
 };
 
 enum class Faces {

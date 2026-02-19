@@ -15,11 +15,15 @@ void Chunk::render(int layer) {
     if (m_vertices.empty()) {
         return;
     }
-    
+
     rlBegin(RL_QUADS);
         rlColor4ub(0, 0, 0, 255);
 
         for (const auto& vertex : m_vertices) {
+            if (layer == 0 && !vertex.shadow) {
+                continue;
+            }
+            
             if (layer != 0) {
                 unsigned char brightness = static_cast<unsigned char>(vertex.brightness * 255);
 
